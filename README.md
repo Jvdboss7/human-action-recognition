@@ -1,2 +1,1 @@
-# deep Classifier project
-
+# human-action-recognition
