@@ -1,1 +1,8 @@
-
+tensorflow==2.9.2
+pandas 
+numpy 
+matplotlib
+tensorflow-hub
+scipy
+boto3
+mypy-boto3-s3
