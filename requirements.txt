@@ -6,3 +6,5 @@ tensorflow-hub
 scipy
 boto3
 mypy-boto3-s3
+dill==0.3.5.1
+-e . 
