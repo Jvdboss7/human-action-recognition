@@ -54,7 +54,9 @@ class DataTransformation:
 
             data_transformation_artifact = DataTransformationArtifacts(
                 transformed_train_object=self.data_transformation_config.TRAIN_TRANSFORM_OBJECT_FILE_PATH,
-                transformed_test_object=self.data_transformation_config.TEST_TRANSFORM_OBJECT_FILE_PATH
+                transformed_test_object=self.data_transformation_config.TEST_TRANSFORM_OBJECT_FILE_PATH,
+                train_data_path = self.data_ingestion_artifact.train_file_path,
+                test_data_path = self.data_ingestion_artifact.test_file_path
                 )
 
             logging.info(f'{data_transformation_artifact}')
@@ -65,4 +67,3 @@ class DataTransformation:
 
         except Exception as e:
             raise CustomException(e, sys) from e
-            
