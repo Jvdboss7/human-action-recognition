@@ -1,140 +1,102 @@
 import os
 import sys
-import keras
-import pickle
-import numpy as np
+import math
 import pandas as pd
-from hate.logger import logging
-from hate.exception import CustomException
-from keras.utils import pad_sequences
-from hate.constants import *
-from hate.configuration.gcloud_syncer import GCloudSync
-from sklearn.metrics import confusion_matrix
-from hate.entity.config_entity import ModelEvaluationConfig
-from hate.entity.artifact_entity import ModelEvaluationArtifacts, ModelTrainerArtifacts, DataTransformationArtifacts
+import numpy as np
+import tensorflow as tf
+from src.constants import *
+from src.logger import logging
+from src.exception import CustomException
+from src.utils.main_utils import load_object
+from src.entity.config_entity import ModelEvaluationConfig
+from src.entity.artifacts_entity import ModelTrainerArtifacts, DataTransformationArtifacts, ModelEvaluationArtifacts
+from src.configuration.s3_syncer import S3Sync
+
 
 class ModelEvaluation:
-    def __init__(self, model_evaluation_config: ModelEvaluationConfig,
-                 model_trainer_artifacts: ModelTrainerArtifacts,
-                 data_transformation_artifacts: DataTransformationArtifacts):
 
+    def __init__(self, model_evaluation_config:ModelEvaluationConfig,
+                data_transformation_artifacts:DataTransformationArtifacts,
+                model_trainer_artifacts:ModelTrainerArtifacts):
 
         self.model_evaluation_config = model_evaluation_config
-        self.model_trainer_artifacts = model_trainer_artifacts
         self.data_transformation_artifacts = data_transformation_artifacts
-        self.gcloud = GCloudSync()
+        self.model_trainer_artifacts = model_trainer_artifacts
+        self.s3 = S3Sync()
+        self.bucket_name = BUCKET_NAME
 
-    def get_best_model_from_gcloud(self) -> str:
+    def get_model_from_s3(self) -> str:
         """
-        :return: Fetch best model from gcloud storage and store inside best model directory path
+        Method Name :   predict
+        Description :   This method predicts the image.
+
+        Output      :   Predictions
         """
+        logging.info("Entered the get_model_from_s3 method of PredictionPipeline class")
         try:
-            logging.info("Entered the get_best_model_from_gcloud method of Model Evaluation class")
+            logging.info(f"Checking the s3_key path{self.model_evaluation_config.TRAINED_MODEL_PATH}")
+            print(f"s3_key_path:{self.model_evaluation_config.TRAINED_MODEL_PATH}")
+            best_model = self.s3.s3_key_path_available(bucket_name=self.model_evaluation_config.S3_BUCKET_NAME,s3_key="ModelTrainerArtifacts/trained_model/")
 
-            os.makedirs(self.model_evaluation_config.BEST_MODEL_DIR_PATH, exist_ok=True)
-
-            self.gcloud.sync_folder_from_gcloud(self.model_evaluation_config.BUCKET_NAME,
-                                                self.model_evaluation_config.MODEL_NAME,
-                                                self.model_evaluation_config.BEST_MODEL_DIR_PATH)
-
-            best_model_path = os.path.join(self.model_evaluation_config.BEST_MODEL_DIR_PATH,
-                                           self.model_evaluation_config.MODEL_NAME)
-            logging.info("Exited the get_best_model_from_gcloud method of Model Evaluation class")
+            if best_model:
+                self.s3.sync_folder_from_s3(folder=self.model_evaluation_config.TRAINED_MODEL_PATH,bucket_name=self.model_evaluation_config.S3_BUCKET_NAME,bucket_folder_name=self.model_evaluation_config.BUCKET_FOLDER_NAME)
+            logging.info("Exited the get_model_from_s3 method of PredictionPipeline class")
+            best_model_path = os.path.join(self.model_evaluation_config.TRAINED_MODEL_PATH)
             return best_model_path
-        except Exception as e:
-            raise CustomException(e, sys) from e 
 
-    def evaluate(self):
-        """
-
-        :param model: Currently trained model or best model from gcloud storage
-        :param data_loader: Data loader for validation dataset
-        :return: loss
-        """
-        try:
-            logging.info("Entering into to the evaluate function of Model Evaluation class")
-            print(self.model_trainer_artifacts.x_test_path)
-
-            x_test = pd.read_csv(self.model_trainer_artifacts.x_test_path,index_col=0)
-            print(x_test)
-            y_test = pd.read_csv(self.model_trainer_artifacts.y_test_path,index_col=0)
-
-            with open('tokenizer.pickle', 'rb') as handle:
-                tokenizer = pickle.load(handle)
-
-            load_model=keras.models.load_model(self.model_trainer_artifacts.trained_model_path)
-
-            x_test = x_test['tweet'].astype(str)
-
-            x_test = x_test.squeeze()
-            y_test = y_test.squeeze()
-
-            test_sequences = tokenizer.texts_to_sequences(x_test)
-            test_sequences_matrix = pad_sequences(test_sequences,maxlen=MAX_LEN)
-            print(f"----------{test_sequences_matrix}------------------")
-
-            print(f"-----------------{x_test.shape}--------------")
-            print(f"-----------------{y_test.shape}--------------")
-            accuracy = load_model.evaluate(test_sequences_matrix,y_test)
-            logging.info(f"the test accuracy is {accuracy}")
-
-            lstm_prediction = load_model.predict(test_sequences_matrix)
-            res = []
-            for prediction in lstm_prediction:
-                if prediction[0] < 0.5:
-                    res.append(0)
-                else:
-                    res.append(1)
-            print(confusion_matrix(y_test,res))
-            logging.info(f"the confusion_matrix is {confusion_matrix(y_test,res)} ")
-            return accuracy
         except Exception as e:
             raise CustomException(e, sys) from e
 
     def initiate_model_evaluation(self) -> ModelEvaluationArtifacts:
         """
-            Method Name :   initiate_model_evaluation
-            Description :   This function is used to initiate all steps of the model evaluation
+                Method Name :   initiate_model_evaluation
+                Description :   This function is used to initiate all steps of the model evaluation
 
-            Output      :   Returns model evaluation artifact
-            On Failure  :   Write an exception log and then raise an exception
+                Output      :   Returns model evaluation artifact
+                On Failure  :   Write an exception log and then raise an exception
         """
-        logging.info("Initiate Model Evaluation")
+
         try:
+            trained_model = tf.keras.models.load_model(self.model_trainer_artifacts.trained_model_path)            
+            test_data = self.model_trainer_artifacts.test_dataset
+            print(test_data)
+            loss = trained_model.evaluate(test_data)
+            print(loss)
 
-            logging.info("Loading currently trained model")
-            trained_model=keras.models.load_model(self.model_trainer_artifacts.trained_model_path)
-            with open('tokenizer.pickle', 'rb') as handle:
-                load_tokenizer = pickle.load(handle)
+            os.makedirs(self.model_evaluation_config.TRAINED_MODEL_PATH, exist_ok=True)
+            
 
-            trained_model_accuracy = self.evaluate()
+            s3_model_path = self.get_model_from_s3()
 
-            logging.info("Fetch best model from gcloud storage")
-            best_model_path = self.get_best_model_from_gcloud()
+            logging.info(f"{s3_model_path}")
 
-            logging.info("Check is best model present in the gcloud storage or not ?")
-            if os.path.isfile(best_model_path) is False:
+            is_model_accepted = False
+            s3model_loss = None 
+            print(f"{os.path.isdir(s3_model_path)}")
+            if os.path.isdir(s3_model_path) is False: 
                 is_model_accepted = True
-                logging.info("glcoud storage model is false and currently trained model accepted is true")
+                print("s3 model is false and model accepted is true")
+                s3model_loss = None
 
             else:
-                logging.info("Load best model fetched from gcloud storage")
-                best_model=keras.models.load_model(best_model_path)
-                best_model_accuracy= self.evaluate()
+                print("Entered inside the else condition")
+                s3_model = tf.keras.models.load_model(s3_model_path)
+                print("Model loaded from s3")
+                s3model_loss = s3_model.evaluate(test_data)
 
-                logging.info("Comparing loss between best_model_loss and trained_model_loss ? ")
-                if best_model_accuracy > trained_model_accuracy:
+                if s3model_loss > loss:
+                    print(f"printing the loss inside the if condition{s3model_loss} and {loss}")
+                    # 0.03 > 0.02
                     is_model_accepted = True
-                    logging.info("Trained model not accepted")
-                else:
-                    is_model_accepted = False
-                    logging.info("Trained model accepted")
+                    print("f{is_model_accepted}")
+            model_evaluation_artifact = ModelEvaluationArtifacts(
+                        is_model_accepted=is_model_accepted,
+                        all_losses=loss)
+            print(f"{model_evaluation_artifact}")
 
-            model_evaluation_artifacts = ModelEvaluationArtifacts(is_model_accepted=is_model_accepted)
-            logging.info("Returning the ModelEvaluationArtifacts")
-            return model_evaluation_artifacts
+            logging.info("Exited the initiate_model_evaluation method of Model Evaluation class")
+            return model_evaluation_artifact
 
         except Exception as e:
             raise CustomException(e, sys) from e
-
 

@@ -72,7 +72,7 @@ class ModelTrainer:
 
             # Fit EfficientNet model 
             efficientnet_history = efficientnet_model.fit(train_data, 
-                                              epochs=5,
+                                              epochs=EPOCH,
                                               steps_per_epoch=len(train_data),
                                               validation_data=test_data,
                                               validation_steps=len(test_data),
@@ -85,7 +85,8 @@ class ModelTrainer:
             logging.info(f"Saved the trained model")
 
             model_trainer_artifacts = ModelTrainerArtifacts(
-                trained_model_path=self.model_trainer_config.TRAINED_MODEL_PATH
+                trained_model_path=self.model_trainer_config.TRAINED_MODEL_PATH,
+                test_dataset = test_data
             )
             logging.info(f"Model trainer artifact: {model_trainer_artifacts}")
 
