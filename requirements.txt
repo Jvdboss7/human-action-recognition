@@ -7,4 +7,8 @@ scipy
 boto3
 mypy-boto3-s3
 dill==0.3.5.1
+Jinja2
+fastapi
+uvicorn
+python-multipart
 -e . 
