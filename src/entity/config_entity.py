@@ -60,3 +60,10 @@ class ModelPusherConfig:
         self.BUCKET_NAME: str = BUCKET_NAME
         self.S3_MODEL_KEY_PATH: str = os.path.join(MODEL_TRAINER_ARTIFACTS_DIR,TRAINED_MODEL_DIR)
     
+@dataclass
+class PredictionPipelineConfig:
+    def __init__(self):
+        self.INPUT_IMAGE = INPUT_IMAGE
+        self.BUCKET_NAME = BUCKET_NAME
+        self.THRESHOLD = THRESHOLD
+        self.IMG_SIZE = IMG_SIZE
