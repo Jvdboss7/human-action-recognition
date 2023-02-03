@@ -36,11 +36,11 @@ jobs:
 
       - run:
           name: pull image from private repository
-          command: docker pull 566373416292.dkr.ecr.ap-south-1.amazonaws.com/videosummarizer:latest
+          command: docker pull 566373416292.dkr.ecr.ap-south-1.amazonaws.com/human-action-recognition:latest
       
       - run:
           name: run image
-          command: docker run -d -p 8080:8080 566373416292.dkr.ecr.ap-south-1.amazonaws.com/videosummarizer:latest
+          command: docker run -d -p 8080:8080 566373416292.dkr.ecr.ap-south-1.amazonaws.com/human-action-recognition:latest
 workflows:
   CICD:
     jobs:
